@@ -11,7 +11,7 @@ Search for POSIX commands effortlessly and locally.
 - **How many commands can pengu return?**
   - As of June 2025, pengu only has 160 commands in its memory. These compose the full POSIX command library. However, we do plan to expand pengu's library and hopefully keep it as lightweight as possible.
 - **Is pengu accurate?**
-  - Of course, pengu won't always give you an accurate answer, as it was built with a relatively lightweight model using spaCy and scikit-learn. However, you can reduce error rates by simply providing a slightly more detailed prompt when searching.
+  - Of course, pengu won't always give you an accurate answer, as it was built with a relatively lightweight model using spaCy and scikit-learn. However, you can reduce error rates by simply providing more detailed prompts with no spelling mistakes.
 
 ## Disclaimer
 - Do not prioritize this over `man` pages and documentation. It should only be used when access to such tools are limited or restricted.

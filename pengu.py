@@ -8,7 +8,7 @@ import hashlib
 import pickle
 import signal
 import numpy as np
-import subprocess
+from subprocess import run, PIPE, DEVNULL
 from pathlib import Path
 from sklearn.linear_model import LogisticRegression
 
@@ -127,16 +127,18 @@ async def run_with_animation(message, func, *args, **kwargs):
 
 
 async def load_model():
-    global nlp
-    nlp = await run_with_animation(
+    return await run_with_animation(
         "Loading base model ...", spacy.load, "en_core_web_sm"
     )
 
 
-async def vectorize_data(items):
+async def vectorize_data(items, nlp):
     return await run_with_animation(
         "Vectorizing data ...",
-        lambda texts: [doc.vector for doc in nlp.pipe(texts, batch_size=64)],
+        lambda texts: [
+            doc.vector
+            for doc in nlp.pipe(texts, batch_size=256, n_process=os.cpu_count())
+        ],
         items,
     )
 
@@ -147,22 +149,20 @@ async def train_model(model, X, y):
     )
 
 
-async def man(command):
-    # Output the a shortened man page for the given command
+async def man(command, operations):
+    assert command in operations  # Safety check
+
+    # Output a shortened man page for the given command
     try:
-        man = subprocess.Popen(
-            ["man", command], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+        result = run(
+            f"man {command} | col -bx",
+            shell=True,
+            check=True,
+            stdout=PIPE,
+            stderr=DEVNULL,
+            text=True,
         )
-        cleanup = subprocess.Popen(
-            ["col", "-bx"],
-            stdin=man.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-        if man.stdout:
-            man.stdout.close()
-        output_bytes, _ = cleanup.communicate()
-        full_text = output_bytes.decode("utf-8", errors="ignore")
+        full_text = result.stdout
     except Exception as e:
         return f"\n{BOLD}{RED}~{END} Error retrieving man page: {e}"
 
@@ -173,23 +173,23 @@ async def man(command):
     lines = full_text.splitlines()
 
     for line in lines:
-        if line.strip().isupper() and line.strip() and line.strip() in sections:
-            current_section = line.strip()
+        stripped = line.strip()
+        if stripped.isupper() and stripped in sections:
+            current_section = stripped
             continue
 
         if current_section in ["NAME", "SYNOPSIS"]:
-            if line.strip().isupper() and line.strip() in sections:
-                current_section = line.strip()
-            elif line.strip() != "":
+            if stripped.isupper() and line.strip() in sections:
+                current_section = stripped
+            elif stripped != "":
                 collected_sections[current_section].append(line)
 
         elif current_section == "DESCRIPTION":
             # Prevent further sections from displaying
-            if line.strip().isupper() and line.strip() not in collected_sections:
+            if stripped.isupper() and stripped not in collected_sections:
                 break
 
-            # Some description pages have subsections
-            # We must hide them to keep it all concise
+            # Formats for subsections
             if (
                 line.startswith("       -")
                 or line.startswith("        1. ")
@@ -209,7 +209,7 @@ async def man(command):
 
 
 async def main():
-    await load_model()
+    nlp = await load_model()
 
     def load_json_file(file_path):
         try:
@@ -244,13 +244,13 @@ async def main():
         labels.extend([i] * len(training_data[operation]))
 
     if vectors is None:
-        vectors = await vectorize_data(inputs)
-        cache_manager.save(vectors=vectors, data_hash=current_data_hash)
+        vectors = await vectorize_data(inputs, nlp)
+        cache_manager.save(vectors=vectors, model=ai, data_hash=current_data_hash)
 
     if ai is None:
         X = np.array(vectors)
         y = np.array(labels)
-        ai = LogisticRegression(n_jobs=-1, max_iter=1000)
+        ai = LogisticRegression(n_jobs=-1)
         await train_model(ai, X, y)
         cache_manager.save(model=ai, data_hash=current_data_hash)
 
@@ -270,7 +270,15 @@ async def main():
 
         vector = nlp(user_input).vector.reshape(1, -1)
         predicted_index = ai.predict(vector)[0]
-        operation = await man(operations[predicted_index])
+
+        if predicted_index >= len(operations):
+            print(
+                f"{BOLD}{RED}~{END} Unexpected prediction. Please reinstall pengu to retrain the model."
+            )
+            await asyncio.sleep(2)
+            continue
+
+        operation = await man(operations[predicted_index], operations)
 
         print(f"{END}\n\n{operation}\n\n")
 
