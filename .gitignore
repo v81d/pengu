@@ -1,0 +1,5 @@
+.venv/
+.pengu-cache/
+manex.py
+pcp.json
+pyrightconfig.json
