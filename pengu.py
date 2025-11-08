@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
-import os
-import spacy
-import json
 import asyncio
 import hashlib
+import json
+import os
 import pickle
 import signal
-import numpy as np
-from subprocess import run, PIPE, DEVNULL
 from pathlib import Path
+from subprocess import DEVNULL, PIPE, run
+
+import numpy as np
+import spacy
 from sklearn.linear_model import LogisticRegression
 
 RED = "\033[31m"
@@ -32,7 +33,7 @@ signal.signal(signal.SIGINT, lambda signum, frame: finish_affinity())
 class CacheManager:
     def __init__(self, cache_dir=None):
         script_dir = Path(__file__).resolve().parent
-        self.cache_dir = Path(cache_dir or script_dir / ".pengu-cache")
+        self.cache_dir = Path(cache_dir or script_dir / ".pengu_cache")
         self.cache_dir.mkdir(exist_ok=True)
         self.vectors_path = self.cache_dir / "pengu_vectors.pkl"
         self.model_path = self.cache_dir / "pengu_model.pkl"
@@ -150,7 +151,7 @@ async def train_model(model, X, y):
 
 
 async def man(command, operations):
-    assert command in operations  # Safety check
+    assert command in operations  # safety check
 
     # Output a shortened man page for the given command
     try:
@@ -185,11 +186,9 @@ async def man(command, operations):
                 collected_sections[current_section].append(line)
 
         elif current_section == "DESCRIPTION":
-            # Prevent further sections from displaying
             if stripped.isupper() and stripped not in collected_sections:
                 break
 
-            # Formats for subsections
             if (
                 line.startswith("       -")
                 or line.startswith("        1. ")
@@ -198,7 +197,6 @@ async def man(command, operations):
                 break
             collected_sections["DESCRIPTION"].append(line)
 
-    # Reveal the shortened man page
     output_parts = []
     for sec in sections:
         content = "\n".join(collected_sections[sec]).strip()
@@ -219,7 +217,7 @@ async def main():
             return None
 
     script_dir = Path(__file__).resolve().parent
-    training_data_path = script_dir / "pengu-training" / "data.json"
+    training_data_path = script_dir / "pengu_training" / "data.json"
     training_data = load_json_file(training_data_path)
 
     if not training_data:
@@ -273,7 +271,9 @@ async def main():
 
         if predicted_index >= len(operations):
             print(
-                f"{BOLD}{RED}~{END} Unexpected prediction. Please reinstall pengu to retrain the model."
+                f"{BOLD}{RED}~{
+                    END
+                } Unexpected prediction. Please reinstall pengu to retrain the model."
             )
             await asyncio.sleep(2)
             continue
@@ -283,7 +283,9 @@ async def main():
         print(f"{END}\n\n{operation}\n\n")
 
         if input(
-            f"{BOLD}{RED}Run {END}{CYAN}man {operations[predicted_index]}{END}{BOLD}{RED} to learn more about this operation.{END}\n"
+            f"{BOLD}{RED}Run {END}{CYAN}man {operations[predicted_index]}{END}{BOLD}{
+                RED
+            } to learn more about this operation.{END}\n"
             f"{BOLD}:: Do you want to search for another operation? [Y/n] {END}"
         ).lower() in ("n", "no"):
             finish_affinity()
