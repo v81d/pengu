@@ -12,10 +12,17 @@ import subprocess
 from pathlib import Path
 from sklearn.linear_model import LogisticRegression
 
+RED = "\033[31m"
+GREEN = "\033[32m"
+BLUE = "\033[34m"
+CYAN = "\033[36m"
+BOLD = "\033[1m"
+END = "\033[0m"
+
 
 def finish_affinity():
     os.system("clear")
-    print("\033[0m🐧 Farewell, pengu!")
+    print(f"{END}Farewell, pengu!")
     exit(0)
 
 
@@ -68,7 +75,7 @@ class CacheManager:
                 with open(path, "rb") as f:
                     return pickle.load(f)
         except Exception as e:
-            print(f"\n\033[1;31m~ \033[0mFailed to read cached data in {path.name}: {e}")
+            print(f"\n{BOLD}{RED}~ {END}Failed to read cached data in {path.name}: {e}")
         return None
 
     def load_vectors(self, current_hash=None):
@@ -81,8 +88,8 @@ class CacheManager:
 def init():
     os.system("clear")
     print(
-        "\033[32m"
-        + r"""
+        f"{GREEN}"
+        r"""
                   ⌐ `' ¬
                  ▄ ` ▌ `|┐
                  ▌  └-╛ ▐╛
@@ -95,7 +102,7 @@ def init():
 ▐██                                        ▐▄▄    ▄▄██
  ▀▀                                          ▀▀▀▀▀▀▀
 """
-        + "\033[0m"
+        f"{END}"
     )
 
 
@@ -143,21 +150,21 @@ async def train_model(model, X, y):
 async def man(command):
     # Output the a shortened man page for the given command
     try:
-        p1 = subprocess.Popen(
+        man = subprocess.Popen(
             ["man", command], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
         )
-        p2 = subprocess.Popen(
+        cleanup = subprocess.Popen(
             ["col", "-bx"],
-            stdin=p1.stdout,
+            stdin=man.stdout,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
-        if p1.stdout:
-            p1.stdout.close()
-        output_bytes, _ = p2.communicate()
+        if man.stdout:
+            man.stdout.close()
+        output_bytes, _ = cleanup.communicate()
         full_text = output_bytes.decode("utf-8", errors="ignore")
     except Exception as e:
-        return f"\n\033[1;31m~ \033[0mError retrieving man page: {e}"
+        return f"\n{BOLD}{RED}~{END} Error retrieving man page: {e}"
 
     sections = ["NAME", "SYNOPSIS", "DESCRIPTION"]
     current_section = None
@@ -183,7 +190,11 @@ async def man(command):
 
             # Some description pages have subsections
             # We must hide them to keep it all concise
-            if line.startswith("   ") and not line.startswith("      "):
+            if (
+                line.startswith("       -")
+                or line.startswith("        1. ")
+                or (line.startswith("   ") and not line.startswith("      "))
+            ):
                 break
             collected_sections["DESCRIPTION"].append(line)
 
@@ -192,7 +203,7 @@ async def man(command):
     for sec in sections:
         content = "\n".join(collected_sections[sec]).strip()
         if content:
-            output_parts.append(f"\033[96m\033[1m{sec}\033[0m\n{content}")
+            output_parts.append(f"{BOLD}{GREEN}{sec}{END}\n{content}")
 
     return "\n\n".join(output_parts)
 
@@ -212,7 +223,10 @@ async def main():
     training_data = load_json_file(training_data_path)
 
     if not training_data:
-        print("\n\033[1;31m~ \033[0mError: Could not find training data in", training_data_path)
+        print(
+            f"\n{BOLD}{RED}~{END} Error: Could not find training data in",
+            training_data_path,
+        )
         return
 
     cache_manager = CacheManager()
@@ -220,9 +234,6 @@ async def main():
 
     ai = cache_manager.load_model(current_data_hash)
     vectors = cache_manager.load_vectors(current_data_hash) if ai is not None else None
-
-    if ai is not None:
-        print("Using cached trained model")
 
     operations = list(training_data.keys())
     inputs = []
@@ -245,12 +256,15 @@ async def main():
 
     while True:
         init()
-        user_input = input(
-            "\033[1mWelcome to pengu! Briefly describe your desired operation (^C to quit): \033[0m"
-        )
 
-        if len(user_input) < 4:
-            print("\033[1;31m~ \033[0mPlease provide a more detailed description.")
+        user_input = input(
+            f"{BOLD}:: Briefly describe your desired operation: {END}"
+        ).strip()
+
+        if not user_input:
+            continue
+        elif len(user_input) < 4:
+            print(f"{BOLD}{RED}~{END} Please provide a more detailed description.")
             await asyncio.sleep(2)
             continue
 
@@ -258,14 +272,12 @@ async def main():
         predicted_index = ai.predict(vector)[0]
         operation = await man(operations[predicted_index])
 
-        print(f"\n\033[0m{operation}\n")
+        print(f"{END}\n\n{operation}\n\n")
 
-        if (
-            input(
-                f"\033[31mpengu can make mistakes. Verify that the information is correct.\n\033[1;36m~ \033[0mDo you want to search for another operation? [Y/n]: \033[0m"
-            ).lower()
-            == "n"
-        ):
+        if input(
+            f"{BOLD}{RED}Run {END}{CYAN}man {operations[predicted_index]}{END}{BOLD}{RED} to learn more about this operation.{END}\n"
+            f"{BOLD}:: Do you want to search for another operation? [Y/n] {END}"
+        ).lower() in ("n", "no"):
             finish_affinity()
 
 
